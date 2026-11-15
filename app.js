@@ -1,4 +1,5 @@
 const KEY="football-tournament-v1";
+const LEGACY_KEY="football-tournament-local-backup";
 const SUPABASE_URL="https://rgjixxsagfnvylwvdpzg.supabase.co";
 const SUPABASE_KEY="sb_publishable_4V3L2HoqXJMOjKiufXmL3w_xM9YppgF";
 const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
@@ -84,11 +85,11 @@ document.getElementById("addTeamBtn").onclick=()=>{state.teams.push({id:uid("t")
 document.getElementById("closeProtocol").onclick=()=>{document.getElementById("protocolModal").hidden=true};document.getElementById("protocolModal").onclick=e=>{if(e.target.id==="protocolModal")e.currentTarget.hidden=true};
 document.getElementById("addPlayerBtn").onclick=()=>{if(!state.teams.length){toast("Сначала добавьте команду");return}let t=state.teams[0];t.players.push({id:uid("p"),name:"Новый игрок",goals:0});save();renderAll();toast("Игрок добавлен в "+t.name)};
 function download(blob,filename){let url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)}
-function backup(){download(new Blob([JSON.stringify(state,null,2)],{type:"application/json"}),"football-tournament-backup.json");toast("Резервная копия выгружена")}
+function backup(){let saved=localStorage.getItem(LEGACY_KEY),data=saved?JSON.parse(saved):state;download(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}),saved?"football-tournament-local-backup.json":"football-tournament-backup.json");toast(saved?"Старая копия с этого устройства выгружена":"Резервная копия выгружена")}
 document.getElementById("backupBtn").onclick=backup;
 document.getElementById("exportCsvBtn").onclick=()=>{let rows=[["Место","Команда","И","В","Н","П","Забито","Пропущено","Разница","Очки"],...standings().map((r,i)=>[i+1,r.name,r.I,r.V,r.N,r.P,r.ZM,r.PM,r.RM,r.O])],csv="\uFEFF"+rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(";")).join("\r\n");download(new Blob([csv],{type:"text/csv;charset=utf-8"}),"football-tournament-table.csv")};
 document.getElementById("importBtn").onclick=()=>document.getElementById("importFile").click();
-document.getElementById("importFile").onchange=async e=>{let f=e.target.files[0];if(!f)return;try{let d=JSON.parse(await f.text());if(!Array.isArray(d.teams)||!Array.isArray(d.matches))throw 0;if(!confirm("Заменить текущие данные резервной копией?"))return;state=d;state.playoff=state.playoff||structuredClone(initial.playoff);save("Копия восстановлена");renderAll()}catch(err){toast("Файл резервной копии не распознан")}finally{e.target.value=""}};
+document.getElementById("importFile").onchange=async e=>{let f=e.target.files[0];if(!f)return;try{let d=JSON.parse(await f.text());if(!Array.isArray(d.teams)||!Array.isArray(d.matches))throw 0;if(!confirm("Заменить текущие данные резервной копией?"))return;state=d;state.playoff=state.playoff||structuredClone(initial.playoff);localStorage.removeItem(LEGACY_KEY);save("Копия восстановлена в общий турнир");renderAll()}catch(err){toast("Файл резервной копии не распознан")}finally{e.target.value=""}};
 if("serviceWorker"in navigator&&location.protocol!=="file:")addEventListener("load",()=>navigator.serviceWorker.register("./service-worker.js").catch(()=>{}));
 
 const adminModal=document.getElementById("adminModal");
@@ -108,8 +109,11 @@ document.getElementById("adminLogout").onclick=async()=>{await db.auth.signOut()
 async function bootShared(){
  const {data,error}=await db.from("tournament_state").select("state,updated_at").eq("id","main").single();
  if(error){document.getElementById("syncStatus").textContent="Не удалось загрузить общие данные";console.error(error);renderAll();return}
+ const localState=(()=>{try{return JSON.parse(localStorage.getItem(KEY))}catch(e){return null}})();
+ if(localState&&JSON.stringify(localState)!==JSON.stringify(initial)&&!localStorage.getItem(LEGACY_KEY)){try{localStorage.setItem(LEGACY_KEY,JSON.stringify(localState))}catch(e){}}
  state=data.state;state.matches.forEach(m=>{if(!Array.isArray(m.events))m.events=[]});
  try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
+ if(localStorage.getItem(LEGACY_KEY))toast("Старая копия сохранена на этом устройстве — нажмите ↗, чтобы выгрузить её");
  const {data:sessionData}=await db.auth.getSession();
  if(sessionData?.session){authUser=sessionData.session.user;const {data:allowed}=await db.from("tournament_admins").select("user_id").eq("user_id",authUser.id).maybeSingle();isAdmin=!!allowed;}
  db.channel("tournament-live").on("postgres_changes",{event:"UPDATE",schema:"public",table:"tournament_state",filter:"id=eq.main"},payload=>{
