@@ -23,3 +23,7 @@
 .match-card[data-open-match]{cursor:pointer}.match-card[data-open-match]:focus-visible{outline:3px solid #96A6B6;outline-offset:2px}
 .cards-summary{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}.cards-summary>div{display:grid;grid-template-columns:auto 1fr;gap:3px 9px;align-items:center;padding:14px;background:#E2E2E4;border:1px solid #C5C5C8;border-radius:13px}.cards-summary strong{font:800 24px "Barlow Condensed"}.cards-summary small{grid-column:2;color:#596579;font-size:10px}.card-yellow{color:#8A6500}.card-red{color:#9B2638}.card-counts{display:flex;flex-direction:column;gap:4px;font-size:10px;font-weight:800;white-space:nowrap}
 @media(min-width:600px){.protocol-backdrop{align-items:center}.event-form{grid-template-columns:1fr 1fr 100px}.event-form label:nth-child(3){grid-column:auto}}
+
+/* Контраст заголовка на первом экране */
+.hero h2{color:#F5F2E1}
+.hero h2 b{color:#F5F2E1}
