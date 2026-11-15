@@ -97,7 +97,7 @@ document.getElementById("adminBtn").onclick=()=>{adminModal.hidden=false;documen
 document.getElementById("closeAdmin").onclick=()=>adminModal.hidden=true;
 adminModal.onclick=e=>{if(e.target===adminModal)adminModal.hidden=true};
 document.getElementById("adminLoginForm").onsubmit=async e=>{
- e.preventDefault();const login=document.getElementById("adminEmail").value.trim(),email=login.toLowerCase()==="alekseev"?"alekseev@football-tournament.local":login,password=document.getElementById("adminPassword").value;
+ e.preventDefault();const login=document.getElementById("adminEmail").value.trim(),email=login.toLowerCase()==="alekseev"?"alexeevv663@gmail.com":login,password=document.getElementById("adminPassword").value;
  const msg=document.getElementById("adminMessage");msg.textContent="Проверяем вход…";
  const {data,error}=await db.auth.signInWithPassword({email,password});
  if(error){msg.textContent="Не удалось войти. Проверьте почту и пароль.";return}
