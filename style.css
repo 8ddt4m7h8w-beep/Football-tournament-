@@ -27,3 +27,6 @@
 /* Контраст заголовка на первом экране */
 .hero h2{color:#F5F2E1}
 .hero h2 b{color:#F5F2E1}
+
+/* Чуть более заметное название гимназии в шапке */
+.topbar .eyebrow{font-size:12px;letter-spacing:1.2px;font-weight:800}
