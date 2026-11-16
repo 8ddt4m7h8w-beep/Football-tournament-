@@ -77,7 +77,7 @@ function renderAll(){renderMatches();renderTable();renderTeams();renderScorers()
 function applyAdminUI(){
  const addTeam=document.getElementById("addTeamBtn"),addPlayer=document.getElementById("addPlayerBtn"),importBtn=document.getElementById("importBtn");
  if(addTeam)addTeam.hidden=!isAdmin;if(addPlayer)addPlayer.hidden=!isAdmin;if(importBtn)importBtn.hidden=!isAdmin;
- const b=document.getElementById("adminBtn");if(b)b.textContent=isAdmin?"Админ ✓":"Вход админа";
+ const b=document.getElementById("adminBtn");if(b)b.setAttribute("aria-label",isAdmin?"Панель администратора":"Вход администратора");
  const status=document.getElementById("syncStatus");if(status)status.textContent=isAdmin?"Вы вошли как администратор · изменения общие":"Публичный просмотр · данные синхронизируются";
 }
 document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x===b));document.querySelectorAll(".view").forEach(x=>x.classList.toggle("active",x.id==="view-"+b.dataset.tab))});
