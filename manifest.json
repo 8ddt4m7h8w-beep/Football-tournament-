@@ -1,7 +1,7 @@
 {
-  "name": "FOOTBALL TOURNAMENT",
-  "short_name": "FOOTBALL",
-  "description": "Школьный футбольный турнир",
+  "name": "Gymnasium Peredelkino Football Championship",
+  "short_name": "GP CHAMPIONSHIP",
+  "description": "Официальный цифровой центр футбольного турнира Гимназии Переделкино",
   "lang": "ru",
   "start_url": "./index.html",
   "scope": "./",
