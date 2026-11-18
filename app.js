@@ -22,10 +22,11 @@ async function save(msg="Сохранено автоматически",immediat
   const snapshot=JSON.parse(JSON.stringify(state));
   try{
    const {data,error}=await db.from("tournament_state")
-    .upsert({id:"main",state:snapshot,updated_at:stamp},{onConflict:"id"})
-    .select("id").single();
+    .update({state:snapshot,updated_at:stamp})
+    .eq("id","main")
+    .select("id").maybeSingle();
    if(error)throw error;
-   if(!data||data.id!=="main")throw new Error("Сервер не подтвердил сохранение");
+   if(!data||data.id!=="main")throw new Error("Запись турнира не найдена или сервер запретил обновление. Проверьте права администратора.");
    lastSavedStamp=stamp;toast(msg);return true;
   }catch(error){
    lastSavedStamp=null;
