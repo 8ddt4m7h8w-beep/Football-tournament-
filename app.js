@@ -83,16 +83,25 @@ function renderProtocol(m){
  };
  const form=document.getElementById("eventForm");
  if(form)form.onsubmit=async e=>{
-  e.preventDefault();let type=document.getElementById("eventType").value,pid=document.getElementById("eventPlayer").value,minute=document.getElementById("eventMinute").value;
+  e.preventDefault();
+  const submit=form.querySelector('button[type="submit"]');
+  if(submit?.disabled)return;
+  let type=document.getElementById("eventType").value,pid=document.getElementById("eventPlayer").value,minute=document.getElementById("eventMinute").value;
   if(!pid){toast("Сначала добавьте игрока в состав");return}
+  const before=structuredClone(m);
   let ev={id:uid("e"),type,playerId:pid,minute:minute?Number(minute):null};m.events.push(ev);m.completed=false;
   if(type==="goal"){let f=findPlayer(pid);if(f?.team.id===m.a)m.scoreA=(m.scoreA??0)+1;else if(f?.team.id===m.b)m.scoreB=(m.scoreB??0)+1}
-  await save("Событие добавлено",true);renderAll();renderProtocol(m);
+  if(submit){submit.disabled=true;submit.textContent="Сохраняем событие…"}
+  if(!(await save("Событие сохранено в протоколе",true))){Object.assign(m,before);renderAll();renderProtocol(m);return}
+  renderAll();renderProtocol(m);
  };
  document.querySelectorAll("[data-remove-event]").forEach(b=>b.onclick=async()=>{
-  let index=Number(b.dataset.removeEvent),ev=m.events[index];
-  if(ev?.type==="goal"){let f=findPlayer(ev.playerId);if(f?.team.id===m.a)m.scoreA=Math.max(0,(m.scoreA??0)-1);else if(f?.team.id===m.b)m.scoreB=Math.max(0,(m.scoreB??0)-1)}
-  m.events.splice(index,1);m.completed=false;await save("Событие удалено",true);renderAll();renderProtocol(m);
+  const index=Number(b.dataset.removeEvent),ev=m.events[index];if(!ev)return;
+  const before=structuredClone(m);
+  if(ev.type==="goal"){let f=findPlayer(ev.playerId);if(f?.team.id===m.a)m.scoreA=Math.max(0,(m.scoreA??0)-1);else if(f?.team.id===m.b)m.scoreB=Math.max(0,(m.scoreB??0)-1)}
+  m.events.splice(index,1);m.completed=false;
+  if(!(await save("Событие удалено из протокола",true))){Object.assign(m,before);renderAll();renderProtocol(m);return}
+  renderAll();renderProtocol(m);
  });
 }
 function renderCards(){let all=[];state.teams.forEach(t=>t.players.forEach(p=>{let yellow=cardCounts(p.id,"yellow"),red=cardCounts(p.id,"red");if(yellow||red)all.push({t,p,yellow,red})}));all.sort((a,b)=>b.red-a.red||b.yellow-a.yellow||a.p.name.localeCompare(b.p.name,"ru"));document.getElementById("yellowTotal").textContent=state.matches.reduce((n,m)=>n+(m.events||[]).filter(e=>e.type==="yellow").length,0);document.getElementById("redTotal").textContent=state.matches.reduce((n,m)=>n+(m.events||[]).filter(e=>e.type==="red").length,0);document.getElementById("cardsList").innerHTML=all.length?all.map(x=>'<div class="scorer-row"><div class="scorer-rank">▰</div><div><div class="scorer-name">'+esc(x.p.name)+'</div><div class="scorer-team">'+esc(x.t.name)+'</div></div><div class="card-counts">'+(x.yellow?'<span class="card-yellow">🟨 '+x.yellow+'</span>':'')+(x.red?'<span class="card-red">🟥 '+x.red+'</span>':'')+'</div></div>').join(""):'<div class="empty">Карточек пока нет. Добавляйте их через протокол матча.</div>'}
