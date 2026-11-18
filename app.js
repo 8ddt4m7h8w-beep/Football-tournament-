@@ -149,7 +149,7 @@ async function bootShared(){
  const {data:sessionData}=await db.auth.getSession();
  if(sessionData?.session){authUser=sessionData.session.user;const {data:allowed}=await db.from("tournament_admins").select("user_id").eq("user_id",authUser.id).maybeSingle();isAdmin=!!allowed;}
  db.channel("tournament-live").on("postgres_changes",{event:"UPDATE",schema:"public",table:"tournament_state",filter:"id=eq.main"},payload=>{
-  if(payload.new.updated_at===lastSavedStamp)return;
+  if(pendingWrites>0||payload.new.updated_at===lastSavedStamp)return;
   state=payload.new.state;state.matches.forEach(m=>{if(!Array.isArray(m.events))m.events=[]});
   try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
   renderAll();toast("Результаты турнира обновлены");
