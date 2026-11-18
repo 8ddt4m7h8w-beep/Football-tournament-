@@ -2,7 +2,7 @@ const KEY="football-tournament-v1";
 const LEGACY_KEY="football-tournament-local-backup";
 const SUPABASE_URL="https://rgjixxsagfnvylwvdpzg.supabase.co";
 const SUPABASE_KEY="sb_publishable_4V3L2HoqXJMOjKiufXmL3w_xM9YppgF";
-const db=window.supabase?.createClient?window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY):null;
+let db=null;
 let isAdmin=false,authUser=null,syncTimer=null,lastSavedStamp=null,saveQueue=Promise.resolve(),pendingWrites=0;
 const initial={teams:[
 {id:"t1",name:"Команда 1",players:[["p1","Шевченко"],["p2","Курбанов"],["p3","Титаренко"],["p4","Буланов"]]},
@@ -158,7 +158,12 @@ async function bootShared(){
  }).subscribe();
  renderAll();
 }
-if(db)db.auth.onAuthStateChange((event,session)=>{if(event==="SIGNED_OUT"){isAdmin=false;authUser=null;renderAll()}});
-
+function startSupabase(){
+ if(window.supabase?.createClient){db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);db.auth.onAuthStateChange((event,session)=>{if(event==="SIGNED_OUT"){isAdmin=false;authUser=null;renderAll()}});bootShared();return}
+ const script=document.createElement("script");script.src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";script.async=true;
+ script.onload=()=>{if(window.supabase?.createClient){db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);db.auth.onAuthStateChange((event,session)=>{if(event==="SIGNED_OUT"){isAdmin=false;authUser=null;renderAll()}});bootShared()}else{document.getElementById("syncStatus").textContent="Общая база временно недоступна · показана копия устройства"}};
+ script.onerror=()=>{document.getElementById("syncStatus").textContent="Нет связи с сервисом синхронизации · показана копия устройства"};
+ document.head.appendChild(script);
+}
 renderAll();
-bootShared();
+startSupabase();
