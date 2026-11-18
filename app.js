@@ -13,16 +13,21 @@ matches:[["m1","t1","t2"],["m2","t3","t4"],["m3","t2","t3"],["m4","t4","t1"],["m
 playoff:{sf1:{scoreA:null,scoreB:null,winner:null},sf2:{scoreA:null,scoreB:null,winner:null},third:{scoreA:null,scoreB:null,winner:null},final:{scoreA:null,scoreB:null,winner:null}}};
 let state=structuredClone(initial);try{state=JSON.parse(localStorage.getItem(KEY))||structuredClone(initial)}catch(e){state=structuredClone(initial)}
 state.matches.forEach(m=>{if(!Array.isArray(m.events))m.events=[]});
-function save(msg="Сохранено автоматически"){
- try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
- if(!isAdmin){toast("Изменения доступны только администратору");return}
+async function save(msg="Сохранено автоматически",immediate=false){
+ try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){toast("Не удалось сохранить копию на устройстве")}
+ if(!isAdmin){toast("Изменения доступны только администратору");return false}
  clearTimeout(syncTimer);
- syncTimer=setTimeout(async()=>{
+ const persist=async()=>{
   const stamp=new Date().toISOString();lastSavedStamp=stamp;
-  const {error}=await db.from("tournament_state").update({state,updated_at:stamp}).eq("id","main");
-  if(error){lastSavedStamp=null;toast("Ошибка синхронизации: "+error.message);return}
-  toast(msg);
- },250);
+  try{
+   const {error}=await db.from("tournament_state").update({state,updated_at:stamp}).eq("id","main");
+   if(error){lastSavedStamp=null;toast("Ошибка синхронизации: "+error.message);return false}
+   toast(msg);return true;
+  }catch(error){lastSavedStamp=null;toast("Ошибка сохранения результата");return false}
+ };
+ if(immediate)return await persist();
+ syncTimer=setTimeout(()=>{persist()},250);
+ return true;
 }
 function toast(s){let e=document.getElementById("toast");e.textContent=s;e.classList.add("show");clearTimeout(toast.timer);toast.timer=setTimeout(()=>e.classList.remove("show"),1700)}
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -57,19 +62,26 @@ function renderProtocol(m){
  }).join("");
  document.getElementById("protocolTitle").textContent=m.label+" · "+name(m.a)+" — "+name(m.b);
  const adminForm=isAdmin?'<form id="eventForm" class="event-form"><label>Событие<select id="eventType"><option value="goal">⚽ Гол</option><option value="yellow">🟨 Жёлтая карточка</option><option value="red">🟥 Красная карточка</option></select></label><label>Игрок<select id="eventPlayer" required>'+opts+'</select></label><label>Минута <input id="eventMinute" type="number" min="1" max="120" inputmode="numeric" placeholder="Например, 7"></label><button class="primary-button" type="submit">＋ Добавить событие</button></form>':'<p class="protocol-footnote">Протокол матча доступен только для просмотра.</p>';
- document.getElementById("protocolContent").innerHTML='<div class="protocol-score"><span>'+esc(name(m.a))+'</span><strong>'+(m.scoreA??"–")+' : '+(m.scoreB??"–")+'</strong><span>'+esc(name(m.b))+'</span></div><h3>События матча</h3>'+(events||'<p class="empty">Событий пока нет.</p>')+adminForm+'<p class="protocol-footnote">Голы из протокола учитываются в бомбардирах, карточки — в дисциплинарной статистике.</p>';
+ const saveButton=isAdmin?'<button class="primary-button" id="saveMatchResult" type="button">Сохранить результат</button>':'';
+ document.getElementById("protocolContent").innerHTML='<div class="protocol-score"><span>'+esc(name(m.a))+'</span><strong>'+(m.scoreA??"–")+' : '+(m.scoreB??"–")+'</strong><span>'+esc(name(m.b))+'</span></div><h3>События матча</h3>'+(events||'<p class="empty">Событий пока нет.</p>')+adminForm+saveButton+'<p class="protocol-footnote">Голы из протокола учитываются в бомбардирах, карточки — в дисциплинарной статистике.</p>';
+ const saveButtonEl=document.getElementById("saveMatchResult");
+ if(saveButtonEl)saveButtonEl.onclick=async()=>{
+  saveButtonEl.disabled=true;saveButtonEl.textContent="Сохраняем…";
+  const ok=await save("Результат матча сохранён",true);
+  if(saveButtonEl.isConnected){saveButtonEl.disabled=false;saveButtonEl.textContent=ok?"Сохранено":"Повторить сохранение"}
+ };
  const form=document.getElementById("eventForm");
- if(form)form.onsubmit=e=>{
+ if(form)form.onsubmit=async e=>{
   e.preventDefault();let type=document.getElementById("eventType").value,pid=document.getElementById("eventPlayer").value,minute=document.getElementById("eventMinute").value;
   if(!pid){toast("Сначала добавьте игрока в состав");return}
   let ev={id:uid("e"),type,playerId:pid,minute:minute?Number(minute):null};m.events.push(ev);
   if(type==="goal"){let f=findPlayer(pid);if(f?.team.id===m.a)m.scoreA=(m.scoreA??0)+1;else if(f?.team.id===m.b)m.scoreB=(m.scoreB??0)+1}
-  save("Событие добавлено");renderAll();renderProtocol(m);
+  await save("Событие добавлено",true);renderAll();renderProtocol(m);
  };
- document.querySelectorAll("[data-remove-event]").forEach(b=>b.onclick=()=>{
+ document.querySelectorAll("[data-remove-event]").forEach(b=>b.onclick=async()=>{
   let index=Number(b.dataset.removeEvent),ev=m.events[index];
   if(ev?.type==="goal"){let f=findPlayer(ev.playerId);if(f?.team.id===m.a)m.scoreA=Math.max(0,(m.scoreA??0)-1);else if(f?.team.id===m.b)m.scoreB=Math.max(0,(m.scoreB??0)-1)}
-  m.events.splice(index,1);save("Событие удалено");renderAll();renderProtocol(m);
+  m.events.splice(index,1);await save("Событие удалено",true);renderAll();renderProtocol(m);
  });
 }
 function renderCards(){let all=[];state.teams.forEach(t=>t.players.forEach(p=>{let yellow=cardCounts(p.id,"yellow"),red=cardCounts(p.id,"red");if(yellow||red)all.push({t,p,yellow,red})}));all.sort((a,b)=>b.red-a.red||b.yellow-a.yellow||a.p.name.localeCompare(b.p.name,"ru"));document.getElementById("yellowTotal").textContent=state.matches.reduce((n,m)=>n+(m.events||[]).filter(e=>e.type==="yellow").length,0);document.getElementById("redTotal").textContent=state.matches.reduce((n,m)=>n+(m.events||[]).filter(e=>e.type==="red").length,0);document.getElementById("cardsList").innerHTML=all.length?all.map(x=>'<div class="scorer-row"><div class="scorer-rank">▰</div><div><div class="scorer-name">'+esc(x.p.name)+'</div><div class="scorer-team">'+esc(x.t.name)+'</div></div><div class="card-counts">'+(x.yellow?'<span class="card-yellow">🟨 '+x.yellow+'</span>':'')+(x.red?'<span class="card-red">🟥 '+x.red+'</span>':'')+'</div></div>').join(""):'<div class="empty">Карточек пока нет. Добавляйте их через протокол матча.</div>'}
