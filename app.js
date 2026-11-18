@@ -2,7 +2,7 @@ const KEY="football-tournament-v1";
 const LEGACY_KEY="football-tournament-local-backup";
 const SUPABASE_URL="https://rgjixxsagfnvylwvdpzg.supabase.co";
 const SUPABASE_KEY="sb_publishable_4V3L2HoqXJMOjKiufXmL3w_xM9YppgF";
-const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+const db=window.supabase?.createClient?window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY):null;
 let isAdmin=false,authUser=null,syncTimer=null,lastSavedStamp=null,saveQueue=Promise.resolve(),pendingWrites=0;
 const initial={teams:[
 {id:"t1",name:"Команда 1",players:[["p1","Шевченко"],["p2","Курбанов"],["p3","Титаренко"],["p4","Буланов"]]},
@@ -16,6 +16,7 @@ state.matches.forEach(m=>{if(!Array.isArray(m.events))m.events=[];if(typeof m.co
 async function save(msg="Изменения сохранены",immediate=false){
  try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){toast("Не удалось сохранить копию на устройстве");return false}
  if(!isAdmin){toast("Войдите как администратор, чтобы сохранить результат");return false}
+ if(!db){toast("Сервис синхронизации временно недоступен");return false}
  clearTimeout(syncTimer);
  if(!immediate){syncTimer=setTimeout(()=>{save(msg,true)},450);return true}
  const task=saveQueue.then(async()=>{
@@ -129,7 +130,7 @@ document.getElementById("adminBtn").onclick=()=>{adminModal.hidden=false;documen
 document.getElementById("closeAdmin").onclick=()=>adminModal.hidden=true;
 adminModal.onclick=e=>{if(e.target===adminModal)adminModal.hidden=true};
 document.getElementById("adminLoginForm").onsubmit=async e=>{
- e.preventDefault();const login=document.getElementById("adminEmail").value.trim(),email=login.toLowerCase()==="alekseev"?"alexeevv663@gmail.com":login,password=document.getElementById("adminPassword").value;
+ e.preventDefault();if(!db){document.getElementById("adminMessage").textContent="Сервис входа временно недоступен. Обновите страницу позже.";return}const login=document.getElementById("adminEmail").value.trim(),email=login.toLowerCase()==="alekseev"?"alexeevv663@gmail.com":login,password=document.getElementById("adminPassword").value;
  const msg=document.getElementById("adminMessage");msg.textContent="Проверяем вход…";
  const {data,error}=await db.auth.signInWithPassword({email,password});
  if(error){msg.textContent="Не удалось войти. Проверьте почту и пароль.";return}
@@ -139,6 +140,7 @@ document.getElementById("adminLoginForm").onsubmit=async e=>{
 };
 document.getElementById("adminLogout").onclick=async()=>{await db.auth.signOut();authUser=null;isAdmin=false;document.getElementById("adminPassword").value="";document.getElementById("adminTitle").textContent="Вход администратора";document.getElementById("adminLogout").hidden=true;adminModal.hidden=true;renderAll();toast("Вы вышли из панели");};
 async function bootShared(){
+ if(!db){document.getElementById("syncStatus").textContent="Офлайн-режим · общая база временно недоступна";renderAll();return}
  const {data,error}=await db.from("tournament_state").select("state,updated_at").eq("id","main").single();
  if(error){document.getElementById("syncStatus").textContent="Не удалось загрузить общие данные";console.error(error);renderAll();return}
  const localState=(()=>{try{return JSON.parse(localStorage.getItem(KEY))}catch(e){return null}})();
@@ -156,6 +158,7 @@ async function bootShared(){
  }).subscribe();
  renderAll();
 }
-db.auth.onAuthStateChange((event,session)=>{if(event==="SIGNED_OUT"){isAdmin=false;authUser=null;renderAll()}});
+if(db)db.auth.onAuthStateChange((event,session)=>{if(event==="SIGNED_OUT"){isAdmin=false;authUser=null;renderAll()}});
 
+renderAll();
 bootShared();
