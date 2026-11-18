@@ -3,50 +3,45 @@ const LEGACY_KEY="football-tournament-local-backup";
 const SUPABASE_URL="https://rgjixxsagfnvylwvdpzg.supabase.co";
 const SUPABASE_KEY="sb_publishable_4V3L2HoqXJMOjKiufXmL3w_xM9YppgF";
 const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
-let isAdmin=false,authUser=null,syncTimer=null,lastSavedStamp=null;
+let isAdmin=false,authUser=null,syncTimer=null,lastSavedStamp=null,saveQueue=Promise.resolve();
 const initial={teams:[
 {id:"t1",name:"Команда 1",players:[["p1","Шевченко"],["p2","Курбанов"],["p3","Титаренко"],["p4","Буланов"]]},
 {id:"t2",name:"Команда 2",players:[["p5","Сахончик"],["p6","Погорелов"],["p7","Данилов"],["p8","Умаров"]]},
 {id:"t3",name:"Команда 3",players:[["p9","Базаев"],["p10","Мухтаров"],["p11","Абубикаров"],["p12","Андреев"]]},
 {id:"t4",name:"Команда 4",players:[["p13","Найдёнов"],["p14","Терехов"],["p15","Мнацаканян"]]}].map(t=>({...t,players:t.players.map(([id,name])=>({id,name,goals:0}))})),
-matches:[["m1","t1","t2"],["m2","t3","t4"],["m3","t2","t3"],["m4","t4","t1"],["m5","t2","t4"],["m6","t1","t3"]].map((x,i)=>({id:x[0],a:x[1],b:x[2],label:"Матч "+(i+1),day:"Среда / пятница · 7-й урок",minutes:10,scoreA:null,scoreB:null,events:[]})),
+matches:[["m1","t1","t2"],["m2","t3","t4"],["m3","t2","t3"],["m4","t4","t1"],["m5","t2","t4"],["m6","t1","t3"]].map((x,i)=>({id:x[0],a:x[1],b:x[2],label:"Матч "+(i+1),day:"Среда / пятница · 7-й урок",minutes:10,scoreA:null,scoreB:null,completed:false,events:[]})),
 playoff:{sf1:{scoreA:null,scoreB:null,winner:null},sf2:{scoreA:null,scoreB:null,winner:null},third:{scoreA:null,scoreB:null,winner:null},final:{scoreA:null,scoreB:null,winner:null}}};
 let state=structuredClone(initial);try{state=JSON.parse(localStorage.getItem(KEY))||structuredClone(initial)}catch(e){state=structuredClone(initial)}
-state.matches.forEach(m=>{if(!Array.isArray(m.events))m.events=[]});
-async function save(msg="Сохранено автоматически",immediate=false){
- try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){toast("Не удалось сохранить копию на устройстве")}
+state.matches.forEach(m=>{if(!Array.isArray(m.events))m.events=[];if(typeof m.completed!=="boolean")m.completed=false});
+async function save(msg="Изменения сохранены",immediate=false){
+ try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){toast("Не удалось сохранить копию на устройстве");return false}
  if(!isAdmin){toast("Войдите как администратор, чтобы сохранить результат");return false}
  clearTimeout(syncTimer);
- const persist=async()=>{
-  const stamp=new Date().toISOString();
-  const snapshot=JSON.parse(JSON.stringify(state));
+ if(!immediate){syncTimer=setTimeout(()=>{save(msg,true)},450);return true}
+ const snapshot=JSON.parse(JSON.stringify(state));
+ const stamp=new Date().toISOString();
+ const task=saveQueue.then(async()=>{
   try{
-   const {data,error}=await db.from("tournament_state")
-    .update({state:snapshot,updated_at:stamp})
-    .eq("id","main")
-    .select("id").maybeSingle();
+   const {data,error}=await db.from("tournament_state").update({state:snapshot,updated_at:stamp}).eq("id","main").select("id,updated_at").maybeSingle();
    if(error)throw error;
-   if(!data||data.id!=="main")throw new Error("Запись турнира не найдена или сервер запретил обновление. Проверьте права администратора.");
-   lastSavedStamp=stamp;toast(msg);return true;
+   if(!data||data.id!=="main")throw new Error("Сервер не обновил запись турнира. Проверьте вход администратора и права доступа.");
+   lastSavedStamp=data.updated_at||stamp;toast(msg);return true;
   }catch(error){
    lastSavedStamp=null;
-   const detail=error?.message||error?.details||"Неизвестная ошибка";
-   toast("Не удалось сохранить: "+detail);
-   console.error("Tournament save failed:",error);
-   return false;
+   const detail=error?.message||error?.details||error?.hint||"Неизвестная ошибка";
+   toast("Ошибка сохранения: "+detail);console.error("Tournament save failed:",error);return false;
   }
- };
- if(immediate)return await persist();
- syncTimer=setTimeout(()=>{persist()},250);
- return true;
+ });
+ saveQueue=task.then(()=>undefined,()=>undefined);
+ return await task;
 }
-function toast(s){let e=document.getElementById("toast");e.textContent=s;e.classList.add("show");clearTimeout(toast.timer);toast.timer=setTimeout(()=>e.classList.remove("show"),1700)}
-const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const team=id=>state.teams.find(t=>t.id===id), name=id=>team(id)?.name||"—", done=m=>Number.isInteger(m.scoreA)&&Number.isInteger(m.scoreB);
-function renderMatches(){let el=document.getElementById("matchesList");el.innerHTML=state.matches.map(m=>`<article class="match-card" data-open-match="${m.id}" tabindex="0" role="button" aria-label="Открыть протокол ${esc(m.label)}"><div class="match-top"><span class="match-label">${esc(m.label)} · Среда / пятница · 7-й урок</span><span class="match-status ${done(m)?"":"pending"}">${done(m)?"ЗАВЕРШЁН":"ОЖИДАЕТСЯ"}</span></div><div class="match-row"><div class="team-side">${esc(name(m.a))}</div><div class="score-box"><input class="score-input" type="number" min="0" max="99" inputmode="numeric" placeholder="0" aria-label="Голы ${esc(name(m.a))}" value="${m.scoreA??0}" data-match="${m.id}" data-side="A" ${isAdmin?"":"disabled"}><span class="score-sep">:</span><input class="score-input" type="number" min="0" max="99" inputmode="numeric" placeholder="0" aria-label="Голы ${esc(name(m.b))}" value="${m.scoreB??0}" data-match="${m.id}" data-side="B" ${isAdmin?"":"disabled"}></div><div class="team-side right">${esc(name(m.b))}</div></div><div class="match-bottom"><span>⏱ ${m.minutes||10} минут · ${m.events?.length||0} событий</span>${isAdmin?`<button class="clear-score" data-clear="${m.id}">Сбросить счёт</button>`:""}</div><div class="open-protocol-hint">Нажмите, чтобы открыть протокол матча →</div></article>`).join("");
+const esc=const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const team=id=>state.teams.find(t=>t.id===id), name=id=>team(id)?.name||"—", done=m=>m.completed===true;
+function renderMatches(){let el=document.getElementById("matchesList");el.innerHTML=state.matches.map(m=>`<article class="match-card" data-open-match="${m.id}" tabindex="0" role="button" aria-label="Открыть протокол ${esc(m.label)}"><div class="match-top"><span class="match-label">${esc(m.label)} · Среда / пятница · 7-й урок</span><span class="match-status ${done(m)?"":"pending"}">${done(m)?"ЗАВЕРШЁН":"ОЖИДАЕТСЯ"}</span></div><div class="match-row"><div class="team-side">${esc(name(m.a))}</div><div class="score-box"><input class="score-input" type="number" min="0" max="99" inputmode="numeric" placeholder="0" aria-label="Голы ${esc(name(m.a))}" value="${m.scoreA??0}" data-match="${m.id}" data-side="A" ${isAdmin?"":"disabled"}><span class="score-sep">:</span><input class="score-input" type="number" min="0" max="99" inputmode="numeric" placeholder="0" aria-label="Голы ${esc(name(m.b))}" value="${m.scoreB??0}" data-match="${m.id}" data-side="B" ${isAdmin?"":"disabled"}></div><div class="team-side right">${esc(name(m.b))}</div></div><div class="match-bottom"><span>⏱ ${m.minutes||10} минут · ${m.events?.length||0} событий</span>${isAdmin?`<button class="clear-score" data-clear="${m.id}">Сбросить матч</button><button class="finish-match" data-finish="${m.id}" ${done(m)?"disabled":""}>${done(m)?"Матч завершён ✓":"Матч завершён"}</button>`:""}</div><div class="open-protocol-hint">Нажмите, чтобы открыть протокол матча →</div></article>`).join("");
 el.querySelectorAll("[data-open-match]").forEach(card=>{card.onclick=e=>{if(e.target.closest("input,button"))return;openProtocol(card.dataset.openMatch)};card.onkeydown=e=>{if((e.key==="Enter"||e.key===" ")&&e.target===card){e.preventDefault();openProtocol(card.dataset.openMatch)}}});
-el.querySelectorAll("[data-match]").forEach(inp=>inp.addEventListener("change",()=>{let m=state.matches.find(m=>m.id===inp.dataset.match),v=inp.value.trim();m["score"+inp.dataset.side]=v===""?null:Math.max(0,Math.min(99,parseInt(v)||0));save();renderAll()}));
-el.querySelectorAll("[data-clear]").forEach(b=>b.onclick=()=>{let m=state.matches.find(m=>m.id===b.dataset.clear);m.scoreA=m.scoreB=null;save();renderAll()})}
+el.querySelectorAll("[data-match]").forEach(inp=>inp.addEventListener("change",()=>{let m=state.matches.find(m=>m.id===inp.dataset.match),v=inp.value.trim();m["score"+inp.dataset.side]=v===""?null:Math.max(0,Math.min(99,parseInt(v)||0));m.completed=false;save();renderAll()}));
+el.querySelectorAll("[data-finish]").forEach(b=>b.onclick=async()=>{let m=state.matches.find(x=>x.id===b.dataset.finish);if(!m)return;const before=structuredClone(m);m.scoreA=m.scoreA??0;m.scoreB=m.scoreB??0;m.completed=true;renderAll();if(!(await save("Матч отмечен как завершённый",true))){Object.assign(m,before);renderAll()}});
+el.querySelectorAll("[data-clear]").forEach(b=>b.onclick=async()=>{let m=state.matches.find(x=>x.id===b.dataset.clear);if(!m)return;if(!confirm("Сбросить счёт и все события этого матча?"))return;const before=structuredClone(m);m.scoreA=null;m.scoreB=null;m.completed=false;m.events=[];renderAll();if(!(await save("Матч сброшен",true))){Object.assign(m,before);renderAll()}})}
 function standings(){let rows=state.teams.map(t=>({id:t.id,name:t.name,I:0,V:0,N:0,P:0,ZM:0,PM:0,RM:0,O:0})),map=Object.fromEntries(rows.map(r=>[r.id,r]));state.matches.forEach(m=>{if(!done(m)||!map[m.a]||!map[m.b])return;let a=map[m.a],b=map[m.b];a.I++;b.I++;a.ZM+=m.scoreA;a.PM+=m.scoreB;b.ZM+=m.scoreB;b.PM+=m.scoreA;if(m.scoreA>m.scoreB){a.V++;b.P++;a.O+=3}else if(m.scoreA<m.scoreB){b.V++;a.P++;b.O+=3}else{a.N++;b.N++;a.O++;b.O++}});rows.forEach(r=>r.RM=r.ZM-r.PM);return rows.sort((a,b)=>b.O-a.O||b.RM-a.RM||b.ZM-a.ZM||a.name.localeCompare(b.name,"ru"))}
 function renderTable(){document.getElementById("standingsBody").innerHTML=standings().map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.name)}</td><td>${r.I}</td><td>${r.V}</td><td>${r.N}</td><td>${r.P}</td><td>${r.ZM}</td><td>${r.PM}</td><td>${r.RM>0?"+"+r.RM:r.RM}</td><td>${r.O}</td></tr>`).join("")}
 function seeds(){let r=standings();return state.matches.every(done)&&r.length>=4?r.slice(0,4).map(x=>x.id):null}
@@ -73,8 +68,10 @@ function renderProtocol(m){
  }).join("");
  document.getElementById("protocolTitle").textContent=m.label+" · "+name(m.a)+" — "+name(m.b);
  const adminForm=isAdmin?'<form id="eventForm" class="event-form"><label>Событие<select id="eventType"><option value="goal">⚽ Гол</option><option value="yellow">🟨 Жёлтая карточка</option><option value="red">🟥 Красная карточка</option></select></label><label>Игрок<select id="eventPlayer" required>'+opts+'</select></label><label>Минута <input id="eventMinute" type="number" min="1" max="120" inputmode="numeric" placeholder="Например, 7"></label><button class="primary-button" type="submit">＋ Добавить событие</button></form>':'<p class="protocol-footnote">Протокол матча доступен только для просмотра.</p>';
- const saveButton=isAdmin?'<button class="primary-button" id="saveMatchResult" type="button">Сохранить результат</button>':'';
+ const saveButton=isAdmin?'<button class="primary-button" id="saveMatchResult" type="button">Сохранить результат</button><button class="primary-button" id="finishMatchProtocol" type="button">'+(done(m)?"Матч завершён ✓":"Матч завершён")+'</button>':'';
  document.getElementById("protocolContent").innerHTML='<div class="protocol-score"><span>'+esc(name(m.a))+'</span><strong>'+(m.scoreA??0)+' : '+(m.scoreB??0)+'</strong><span>'+esc(name(m.b))+'</span></div><h3>События матча</h3>'+(events||'<p class="empty">Событий пока нет.</p>')+adminForm+saveButton+'<p class="protocol-footnote">Голы из протокола учитываются в бомбардирах, карточки — в дисциплинарной статистике.</p>';
+ const finishButton=document.getElementById("finishMatchProtocol");
+ if(finishButton){finishButton.disabled=done(m);finishButton.onclick=async()=>{const before=structuredClone(m);m.scoreA=m.scoreA??0;m.scoreB=m.scoreB??0;m.completed=true;renderAll();renderProtocol(m);if(!(await save("Матч отмечен как завершённый",true))){Object.assign(m,before);renderAll();renderProtocol(m)}}}
  const saveButtonEl=document.getElementById("saveMatchResult");
  if(saveButtonEl)saveButtonEl.onclick=async()=>{
   saveButtonEl.disabled=true;saveButtonEl.textContent="Сохраняем…";
@@ -85,14 +82,14 @@ function renderProtocol(m){
  if(form)form.onsubmit=async e=>{
   e.preventDefault();let type=document.getElementById("eventType").value,pid=document.getElementById("eventPlayer").value,minute=document.getElementById("eventMinute").value;
   if(!pid){toast("Сначала добавьте игрока в состав");return}
-  let ev={id:uid("e"),type,playerId:pid,minute:minute?Number(minute):null};m.events.push(ev);
+  let ev={id:uid("e"),type,playerId:pid,minute:minute?Number(minute):null};m.events.push(ev);m.completed=false;
   if(type==="goal"){let f=findPlayer(pid);if(f?.team.id===m.a)m.scoreA=(m.scoreA??0)+1;else if(f?.team.id===m.b)m.scoreB=(m.scoreB??0)+1}
   await save("Событие добавлено",true);renderAll();renderProtocol(m);
  };
  document.querySelectorAll("[data-remove-event]").forEach(b=>b.onclick=async()=>{
   let index=Number(b.dataset.removeEvent),ev=m.events[index];
   if(ev?.type==="goal"){let f=findPlayer(ev.playerId);if(f?.team.id===m.a)m.scoreA=Math.max(0,(m.scoreA??0)-1);else if(f?.team.id===m.b)m.scoreB=Math.max(0,(m.scoreB??0)-1)}
-  m.events.splice(index,1);await save("Событие удалено",true);renderAll();renderProtocol(m);
+  m.events.splice(index,1);m.completed=false;await save("Событие удалено",true);renderAll();renderProtocol(m);
  });
 }
 function renderCards(){let all=[];state.teams.forEach(t=>t.players.forEach(p=>{let yellow=cardCounts(p.id,"yellow"),red=cardCounts(p.id,"red");if(yellow||red)all.push({t,p,yellow,red})}));all.sort((a,b)=>b.red-a.red||b.yellow-a.yellow||a.p.name.localeCompare(b.p.name,"ru"));document.getElementById("yellowTotal").textContent=state.matches.reduce((n,m)=>n+(m.events||[]).filter(e=>e.type==="yellow").length,0);document.getElementById("redTotal").textContent=state.matches.reduce((n,m)=>n+(m.events||[]).filter(e=>e.type==="red").length,0);document.getElementById("cardsList").innerHTML=all.length?all.map(x=>'<div class="scorer-row"><div class="scorer-rank">▰</div><div><div class="scorer-name">'+esc(x.p.name)+'</div><div class="scorer-team">'+esc(x.t.name)+'</div></div><div class="card-counts">'+(x.yellow?'<span class="card-yellow">🟨 '+x.yellow+'</span>':'')+(x.red?'<span class="card-red">🟥 '+x.red+'</span>':'')+'</div></div>').join(""):'<div class="empty">Карточек пока нет. Добавляйте их через протокол матча.</div>'}
