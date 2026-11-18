@@ -15,15 +15,25 @@ let state=structuredClone(initial);try{state=JSON.parse(localStorage.getItem(KEY
 state.matches.forEach(m=>{if(!Array.isArray(m.events))m.events=[]});
 async function save(msg="Сохранено автоматически",immediate=false){
  try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){toast("Не удалось сохранить копию на устройстве")}
- if(!isAdmin){toast("Изменения доступны только администратору");return false}
+ if(!isAdmin){toast("Войдите как администратор, чтобы сохранить результат");return false}
  clearTimeout(syncTimer);
  const persist=async()=>{
-  const stamp=new Date().toISOString();lastSavedStamp=stamp;
+  const stamp=new Date().toISOString();
+  const snapshot=JSON.parse(JSON.stringify(state));
   try{
-   const {error}=await db.from("tournament_state").update({state,updated_at:stamp}).eq("id","main");
-   if(error){lastSavedStamp=null;toast("Ошибка синхронизации: "+error.message);return false}
-   toast(msg);return true;
-  }catch(error){lastSavedStamp=null;toast("Ошибка сохранения результата");return false}
+   const {data,error}=await db.from("tournament_state")
+    .upsert({id:"main",state:snapshot,updated_at:stamp},{onConflict:"id"})
+    .select("id").single();
+   if(error)throw error;
+   if(!data||data.id!=="main")throw new Error("Сервер не подтвердил сохранение");
+   lastSavedStamp=stamp;toast(msg);return true;
+  }catch(error){
+   lastSavedStamp=null;
+   const detail=error?.message||error?.details||"Неизвестная ошибка";
+   toast("Не удалось сохранить: "+detail);
+   console.error("Tournament save failed:",error);
+   return false;
+  }
  };
  if(immediate)return await persist();
  syncTimer=setTimeout(()=>{persist()},250);
