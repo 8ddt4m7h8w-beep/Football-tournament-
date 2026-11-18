@@ -3,7 +3,7 @@ const LEGACY_KEY="football-tournament-local-backup";
 const SUPABASE_URL="https://rgjixxsagfnvylwvdpzg.supabase.co";
 const SUPABASE_KEY="sb_publishable_4V3L2HoqXJMOjKiufXmL3w_xM9YppgF";
 const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
-let isAdmin=false,authUser=null,syncTimer=null,lastSavedStamp=null,saveQueue=Promise.resolve();
+let isAdmin=false,authUser=null,syncTimer=null,lastSavedStamp=null,saveQueue=Promise.resolve(),pendingWrites=0;
 const initial={teams:[
 {id:"t1",name:"Команда 1",players:[["p1","Шевченко"],["p2","Курбанов"],["p3","Титаренко"],["p4","Буланов"]]},
 {id:"t2",name:"Команда 2",players:[["p5","Сахончик"],["p6","Погорелов"],["p7","Данилов"],["p8","Умаров"]]},
@@ -18,19 +18,22 @@ async function save(msg="Изменения сохранены",immediate=false)
  if(!isAdmin){toast("Войдите как администратор, чтобы сохранить результат");return false}
  clearTimeout(syncTimer);
  if(!immediate){syncTimer=setTimeout(()=>{save(msg,true)},450);return true}
- const snapshot=JSON.parse(JSON.stringify(state));
- const stamp=new Date().toISOString();
  const task=saveQueue.then(async()=>{
+  const snapshot=JSON.parse(JSON.stringify(state));
+  const stamp=new Date().toISOString();
+  pendingWrites++;
   try{
    const {data,error}=await db.from("tournament_state").update({state:snapshot,updated_at:stamp}).eq("id","main").select("id,updated_at").maybeSingle();
    if(error)throw error;
-   if(!data||data.id!=="main")throw new Error("Сервер не обновил запись турнира. Проверьте вход администратора и права доступа.");
-   lastSavedStamp=data.updated_at||stamp;toast(msg);return true;
+   if(!data||data.id!=="main")throw new Error("Сервер не подтвердил запись. Проверьте вход администратора.");
+   lastSavedStamp=data.updated_at||stamp;
+   try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
+   toast(msg);return true;
   }catch(error){
    lastSavedStamp=null;
    const detail=error?.message||error?.details||error?.hint||"Неизвестная ошибка";
-   toast("Ошибка сохранения: "+detail);console.error("Tournament save failed:",error);return false;
-  }
+   toast("Не удалось сохранить: "+detail);console.error("Tournament save failed:",error);return false;
+  }finally{pendingWrites=Math.max(0,pendingWrites-1)}
  });
  saveQueue=task.then(()=>undefined,()=>undefined);
  return await task;
