@@ -56,7 +56,7 @@ function playoffCard(key,label,ids){
  const m=state.playoff[key]||(state.playoff[key]={scoreA:null,scoreB:null,winner:null,notes:"",events:[]});
  if(!Array.isArray(m.events))m.events=[];
  const w=winner(m,[ids.a,ids.b]);
- const displayA=m.scoreA??(m.shootout?m.shootout.scoreA:null),displayB=m.scoreB??(m.shootout?m.shootout.scoreB:null);
+ const displayA=m.shootout?.scoreA??m.scoreA,displayB=m.shootout?.scoreB??m.scoreB;
  const result=displayA!==null&&displayB!==null?displayA+" : "+displayB:"— : —";
  const headline=key==="third"?(w?esc(name(w))+" — 3-е место":"Матч за 3-е место"):(w?"ЧЕМПИОН: "+esc(name(w)):"ФИНАЛ");
  const status=w?(key==="third"?"3-Е МЕСТО ОПРЕДЕЛЕНО":"ЧЕМПИОН ОПРЕДЕЛЁН"):"ОЖИДАЕТСЯ";
