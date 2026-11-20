@@ -51,10 +51,61 @@ function renderTable(){document.getElementById("standingsBody").innerHTML=standi
 function seeds(){const r=standings();return r.length>=4?r.map(x=>x.id):null}
 function winner(m,ids){if(m.winner&&ids.includes(m.winner))return m.winner;if(Number.isInteger(m.scoreA)&&Number.isInteger(m.scoreB)&&m.scoreA!==m.scoreB)return m.scoreA>m.scoreB?ids[0]:ids[1];return null}
 function playoffData(){const s=seeds();if(!s)return null;return {final:{a:s[0],b:s[1]},third:{a:s[3],b:s[2]}}}
-function playoffCard(key,label,ids){const m=state.playoff[key]||(state.playoff[key]={scoreA:null,scoreB:null,winner:null,notes:""});const w=winner(m,[ids.a,ids.b]);const shootout=m.shootout?'<div class="playoff-shootout"><strong>Серия пенальти</strong><div>1:0 Буланов</div></div>':"";const notes=esc(m.notes||"");return `<article class="match-card playoff-match" data-playoff-card="${key}"><div class="match-top"><span class="match-label">${label}</span><span class="match-status ${w?"":"pending"}">${w?(key==="third"?"3-Е МЕСТО ОПРЕДЕЛЕНО":"ПОБЕДИТЕЛЬ ОПРЕДЕЛЁН"):"ОЖИДАЕТСЯ"}</span></div><div class="match-row"><div class="team-side">${esc(name(ids.a))}</div><div class="score-box"><input class="score-input" type="number" min="0" max="99" inputmode="numeric" placeholder="—" value="${m.scoreA??""}" data-play-score="${key}" data-side="A" ${isAdmin?"":"disabled"}><span class="score-sep">:</span><input class="score-input" type="number" min="0" max="99" inputmode="numeric" placeholder="—" value="${m.scoreB??""}" data-play-score="${key}" data-side="B" ${isAdmin?"":"disabled"}></div><div class="team-side right">${esc(name(ids.b))}</div></div>${shootout}${w?'<div class="match-bottom"><strong>'+(key==="third"?"3-е место: ":"Победитель: ")+esc(name(w))+"</strong></div>":""}${isAdmin?`<label class="playoff-notes-label">События / примечания матча<textarea class="playoff-notes" data-play-notes="${key}" rows="3" placeholder="Запиши голы, события или детали матча...">${notes}</textarea></label><div class="match-bottom playoff-actions"><button class="primary-button playoff-save" data-play-save="${key}" type="button">Сохранить результат</button><button class="finish-match-button" data-play-finish="${key}" type="button" ${m.completed?"disabled":""}>${m.completed?"Матч окончен ✓":"Матч окончен"}</button></div>`:'<p class="protocol-footnote">'+(notes||"Подробности матча пока не добавлены.")+"</p>"}</article>`}
-function renderPlayoff(){const el=document.getElementById("playoffList"),p=playoffData();if(!p){el.innerHTML='<div class="match-card"><div class="empty">Для плей-офф нужны четыре команды в таблице.</div></div>';return}el.innerHTML=playoffCard("third","Матч за 3-е место",p.third)+playoffCard("final","ФИНАЛ",p.final);
-el.querySelectorAll("[data-play-save]").forEach(b=>b.onclick=async()=>{const key=b.dataset.playSave,m=state.playoff[key],before=structuredClone(m);const a=el.querySelector('[data-play-score="'+key+'"][data-side="A"]'),z=el.querySelector('[data-play-score="'+key+'"][data-side="B"]'),n=el.querySelector('[data-play-notes="'+key+'"]');m.scoreA=a.value.trim()===""?null:Math.max(0,Math.min(99,parseInt(a.value)||0));m.scoreB=z.value.trim()===""?null:Math.max(0,Math.min(99,parseInt(z.value)||0));m.notes=n.value;const previousWinner=m.winner;if(m.scoreA!==null&&m.scoreB!==null&&m.scoreA!==m.scoreB)m.winner=m.scoreA>m.scoreB?p[key].a:p[key].b;else m.winner=previousWinner;b.disabled=true;b.textContent="Сохраняем…";if(!(await save("Результат плей-офф сохранён",true))){Object.assign(m,before);renderAll();return}renderAll()});
-el.querySelectorAll("[data-play-finish]").forEach(b=>b.onclick=async()=>{const key=b.dataset.playFinish,m=state.playoff[key],before=structuredClone(m);if(m.scoreA===null||m.scoreB===null){toast("Сначала внесите счёт матча");return}if(m.scoreA===m.scoreB&&!m.winner){toast("При ничьей укажите победителя в примечании и выберите его вручную позже");return}m.completed=true;if(!(await save("Матч плей-офф окончен",true))){Object.assign(m,before);renderAll();return}renderAll()})}
+function playoffCard(key,label,ids){
+ const m=state.playoff[key]||(state.playoff[key]={scoreA:null,scoreB:null,winner:null,notes:"",events:[]});
+ if(!Array.isArray(m.events))m.events=[];
+ const w=winner(m,[ids.a,ids.b]);
+ const shootout=m.shootout?'<div class="playoff-shootout"><strong>Серия пенальти</strong><div>'+esc(m.shootout.scoreA??1)+':'+esc(m.shootout.scoreB??0)+(m.shootout.scorer?' '+esc(m.shootout.scorer):'')+'</div></div>':'';
+ const notes=esc(m.notes||'');
+ const events=m.events.map((e,i)=>{const f=findPlayer(e.playerId),symbol=e.type==='goal'?'⚽':e.type==='yellow'?'🟨':'🟥';return '<div class="playoff-event"><span>'+symbol+'</span><div><strong>'+esc(f?.player.name||'Игрок')+'</strong><small>'+esc(f?.team.name||'')+' · '+esc(e.type==='goal'?'Гол':e.type==='yellow'?'Жёлтая карточка':'Красная карточка')+(e.minute?' · '+esc(e.minute)+'′':'')+'</small></div>'+(isAdmin?'<button type="button" class="small-delete" data-play-remove="'+key+'" data-index="'+i+'" aria-label="Удалить событие">×</button>':'')+'</div>'}).join('');
+ const players=state.teams.filter(t=>t.id===ids.a||t.id===ids.b).flatMap(t=>t.players.map(p=>({team:t,player:p})));
+ const options=players.map(x=>'<option value="'+esc(x.player.id)+'">'+esc(x.player.name)+' · '+esc(x.team.name)+'</option>').join('');
+ const winnerOptions='<option value="">Выбрать победителя при ничьей</option><option value="'+ids.a+'" '+(m.winner===ids.a?'selected':'')+'>'+esc(name(ids.a))+'</option><option value="'+ids.b+'" '+(m.winner===ids.b?'selected':'')+'>'+esc(name(ids.b))+'</option>';
+ const admin=isAdmin?'<form class="playoff-event-form" data-play-event="'+key+'"><label>Событие<select name="type"><option value="goal">⚽ Гол</option><option value="yellow">🟨 Жёлтая карточка</option><option value="red">🟥 Красная карточка</option></select></label><label>Игрок<select name="player" required>'+options+'</select></label><label>Минута<input name="minute" type="number" min="1" max="120" inputmode="numeric" placeholder="Минута"></label><button class="primary-button" type="submit">＋ Добавить событие</button></form><label class="playoff-notes-label">Примечания к матчу<textarea class="playoff-notes" data-play-notes="'+key+'" rows="3" placeholder="Дополнительные детали матча...">'+notes+'</textarea></label><label class="playoff-winner-label">Победитель при ничьей<select data-play-winner="'+key+'">'+winnerOptions+'</select></label><div class="match-bottom playoff-actions"><button class="primary-button playoff-save" data-play-save="'+key+'" type="button">Сохранить результат</button><button class="finish-match-button" data-play-finish="'+key+'" type="button" '+(m.completed?'disabled':'')+'>'+(m.completed?'Матч окончен ✓':'Матч окончен')+'</button></div>':'<p class="protocol-footnote">'+(notes||'Подробности матча пока не добавлены.')+'</p>';
+ return '<article class="match-card playoff-match" data-playoff-card="'+key+'"><div class="match-top"><span class="match-label">'+label+'</span><span class="match-status '+(w?'':'pending')+'">'+(w?(key==='third'?'3-Е МЕСТО ОПРЕДЕЛЕНО':'ПОБЕДИТЕЛЬ ОПРЕДЕЛЁН'):'ОЖИДАЕТСЯ')+'</span></div><div class="match-row"><div class="team-side">'+esc(name(ids.a))+'</div><div class="score-box"><input class="score-input" type="number" min="0" max="99" inputmode="numeric" placeholder="—" value="'+(m.scoreA??'')+'" data-play-score="'+key+'" data-side="A" '+(isAdmin?'':'disabled')+'><span class="score-sep">:</span><input class="score-input" type="number" min="0" max="99" inputmode="numeric" placeholder="—" value="'+(m.scoreB??'')+'" data-play-score="'+key+'" data-side="B" '+(isAdmin?'':'disabled')+'></div><div class="team-side right">'+esc(name(ids.b))+'</div></div>'+shootout+(w?'<div class="match-bottom"><strong>'+(key==='third'?'3-е место: ':'Победитель: ')+esc(name(w))+'</strong></div>':'')+(events?'<div class="playoff-events"><h3>События матча</h3>'+events+'</div>':'<p class="empty playoff-empty-events">Событий пока нет.</p>')+admin+'</article>';
+}
+function renderPlayoff(){
+ const el=document.getElementById('playoffList'),p=playoffData();
+ if(!p){el.innerHTML='<div class="match-card"><div class="empty">Для плей-офф нужны четыре команды в таблице.</div></div>';return}
+ el.innerHTML=playoffCard('third','Матч за 3-е место',p.third)+playoffCard('final','ФИНАЛ',p.final);
+ el.querySelectorAll('[data-play-save]').forEach(b=>b.onclick=async()=>{
+  const key=b.dataset.playSave,m=state.playoff[key],before=structuredClone(m);
+  const a=el.querySelector('[data-play-score="'+key+'"][data-side="A"]'),z=el.querySelector('[data-play-score="'+key+'"][data-side="B"]'),n=el.querySelector('[data-play-notes="'+key+'"]'),w=el.querySelector('[data-play-winner="'+key+'"]');
+  m.scoreA=a.value.trim()===''?null:Math.max(0,Math.min(99,parseInt(a.value)||0));m.scoreB=z.value.trim()===''?null:Math.max(0,Math.min(99,parseInt(z.value)||0));m.notes=n.value;
+  if(m.scoreA!==null&&m.scoreB!==null&&m.scoreA!==m.scoreB)m.winner=m.scoreA>m.scoreB?p[key].a:p[key].b;
+  else if(m.scoreA!==null&&m.scoreB!==null&&m.scoreA===m.scoreB)m.winner=w.value||null;
+  b.disabled=true;b.textContent='Сохраняем…';
+  if(!(await save('Результат плей-офф сохранён',true))){Object.assign(m,before);renderAll();return}
+  renderAll();
+ });
+ el.querySelectorAll('[data-play-event]').forEach(form=>form.onsubmit=async e=>{
+  e.preventDefault();
+  const key=form.dataset.playEvent,m=state.playoff[key],before=structuredClone(m),type=form.elements.type.value,pid=form.elements.player.value,minute=form.elements.minute.value;
+  if(!pid){toast('Сначала добавьте игрока в состав');return}
+  const min=minute?Number(minute):null;if(min!==null&&(!Number.isInteger(min)||min<1||min>120)){toast('Проверьте минуту события');return}
+  const player=findPlayer(pid);if(!player||(player.team.id!==p[key].a&&player.team.id!==p[key].b)){toast('Игрок должен быть из одной из команд этого матча');return}
+  m.events.push({id:uid('pe'),type,playerId:pid,teamId:player.team.id,minute:min});m.completed=false;
+  if(type==='goal'){if(player.team.id===p[key].a)m.scoreA=(m.scoreA??0)+1;else m.scoreB=(m.scoreB??0)+1;m.winner=null}
+  const submit=form.querySelector('button[type="submit"]');if(submit){submit.disabled=true;submit.textContent='Сохраняем…'}
+  if(!(await save('Событие плей-офф сохранено',true))){Object.assign(m,before);renderAll();return}
+  renderAll();
+ });
+ el.querySelectorAll('[data-play-remove]').forEach(b=>b.onclick=async()=>{
+  const key=b.dataset.playRemove,m=state.playoff[key],before=structuredClone(m),index=Number(b.dataset.index),ev=m.events[index];if(!ev)return;
+  if(ev.type==='goal'){if(ev.teamId===p[key].a)m.scoreA=Math.max(0,(m.scoreA??0)-1);else if(ev.teamId===p[key].b)m.scoreB=Math.max(0,(m.scoreB??0)-1);m.winner=null}
+  m.events.splice(index,1);m.completed=false;
+  if(!(await save('Событие удалено',true))){Object.assign(m,before);renderAll();return}
+  renderAll();
+ });
+ el.querySelectorAll('[data-play-finish]').forEach(b=>b.onclick=async()=>{
+  const key=b.dataset.playFinish,m=state.playoff[key],before=structuredClone(m);
+  if(m.scoreA===null||m.scoreB===null){if(!m.winner){toast('Сначала внесите счёт или укажите победителя по серии пенальти');return}}
+  else if(m.scoreA===m.scoreB&&!m.winner){toast('При ничьей выберите победителя');return}
+  m.completed=true;
+  if(!(await save('Матч плей-офф окончен',true))){Object.assign(m,before);renderAll();return}
+  renderAll();
+ });
+}
 function findPlayer(id){for(let t of state.teams){let p=t.players.find(p=>p.id===id);if(p)return {team:t,player:p}}return null}
 function uid(prefix){return prefix+"_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,6)}
 function renderTeams(){let el=document.getElementById("teamsList");el.innerHTML=state.teams.map((t,i)=>`<article class="team-card"><div class="team-title-row"><span class="team-badge">${String(i+1).padStart(2,"0")}</span><input class="team-name-input" value="${esc(t.name)}" aria-label="Название команды" ${isAdmin?"":"readonly"} data-teamname="${t.id}">${isAdmin?`<button class="small-delete" data-delteam="${t.id}" title="Удалить команду">×</button>`:""}</div>${t.players.map(p=>`<div class="player-row"><input class="player-name-input" value="${esc(p.name)}" aria-label="Имя игрока" ${isAdmin?"":"readonly"} data-playername="${p.id}">${isAdmin?`<button class="small-delete" data-delplayer="${t.id}:${p.id}" title="Удалить игрока">×</button>`:""}</div>`).join("")}${isAdmin?`<button class="add-player-team" data-addplayer="${t.id}">＋ Добавить игрока в состав</button>`:""}</article>`).join("");
