@@ -50,3 +50,23 @@
 .finish-match-panel{margin-top:14px;padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}.finish-match-panel p{margin:0 0 10px;color:var(--muted);font-size:12px;line-height:1.45}.finish-match-button{display:block;width:100%;padding:15px;border:0;border-radius:12px;background:var(--green);color:#F5F2E1;font-size:14px;font-weight:900}.finish-match-button:disabled{opacity:.6;cursor:default}
 
 .playoff-notes-label{display:grid;gap:7px;margin-top:14px;font-size:11px;font-weight:800;color:var(--text)}.playoff-notes{width:100%;resize:vertical;min-height:72px;padding:11px;border:1px solid var(--line);border-radius:10px;background:var(--panel2);color:var(--text);font:12px/1.5 Inter,sans-serif}.playoff-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.playoff-actions .primary-button,.playoff-actions .finish-match-button{margin:0;min-height:44px;padding:10px;font-size:11px}.playoff-shootout{margin:12px 0 4px;padding:12px;border:1px solid var(--line);border-radius:11px;background:#E8DDE0;color:#3C1122;font-size:12px;line-height:1.6}.playoff-shootout strong{display:block;font-size:11px;letter-spacing:.4px}
+
+
+/* Playoff match event editor */
+.playoff-event-form{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:14px 0;padding:12px;background:#f5f2e1;border:1px solid #c5c5c8;border-radius:12px}
+.playoff-event-form label,.playoff-notes-label,.playoff-winner-label{display:grid;gap:5px;color:#596579;font-size:11px;font-weight:700}
+.playoff-event-form label:nth-child(3),.playoff-event-form button{grid-column:1/-1}
+.playoff-event-form select,.playoff-event-form input,.playoff-winner-label select{width:100%;min-width:0;min-height:38px;padding:8px;border:1px solid #c5c5c8;border-radius:8px;background:#fff;color:#1e2945;font:inherit}
+.playoff-notes-label{margin:10px 0}
+.playoff-notes{width:100%;box-sizing:border-box;padding:10px;border:1px solid #c5c5c8;border-radius:9px;background:#fff;color:#1e2945;font:inherit;resize:vertical}
+.playoff-winner-label{margin:10px 0}
+.playoff-events{display:grid;gap:8px;margin:12px 0}
+.playoff-events h3{margin:0;color:#1e2945;font-size:12px}
+.playoff-event{display:grid;grid-template-columns:22px minmax(0,1fr) auto;align-items:center;gap:8px;padding:9px 10px;border:1px solid #dedede;border-radius:9px;background:#fff}
+.playoff-event>div{display:grid;gap:3px;min-width:0}
+.playoff-event strong{color:#1e2945;font-size:12px}
+.playoff-event small{color:#697386;font-size:10px}
+.playoff-empty-events{margin:10px 0}
+.playoff-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.playoff-actions button{min-width:0}
+@media(max-width:420px){.playoff-event-form{grid-template-columns:1fr}.playoff-event-form label,.playoff-event-form button{grid-column:1}}
