@@ -70,3 +70,17 @@
 .playoff-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .playoff-actions button{min-width:0}
 @media(max-width:420px){.playoff-event-form{grid-template-columns:1fr}.playoff-event-form label,.playoff-event-form button{grid-column:1}}
+
+/* Краткая карточка плей-офф на главном экране; подробности находятся в протоколе */
+.playoff-summary-card{cursor:pointer}
+.playoff-summary-card:focus-visible{outline:3px solid #96A6B6;outline-offset:2px}
+.playoff-summary-score{font:900 25px "Barlow Condensed";white-space:nowrap;text-align:center;color:#3C1122}
+.playoff-result-title{margin-top:14px;padding:13px 10px;border-radius:12px;text-align:center;font:900 22px/1.1 "Barlow Condensed";letter-spacing:.3px}
+.third-place-result{background:#E8DDE0;color:#3C1122;font-size:30px;padding:17px 10px}
+.champion-result{background:#1E2945;color:#F5F2E1;font-size:24px}
+.playoff-protocol-editor{margin-top:16px}
+.playoff-score-edit{display:grid;grid-template-columns:1fr auto 1fr;align-items:end;gap:10px;padding:12px;background:#E2E2E4;border:1px solid #C5C5C8;border-radius:12px}
+.playoff-score-edit label{display:grid;gap:6px;font-size:10px;font-weight:800;min-width:0}
+.playoff-score-edit input{width:100%;min-width:0;padding:12px;border:1px solid #96A6B6;border-radius:9px;background:#fff;color:#1E2945;font:800 22px "Barlow Condensed";text-align:center}
+.playoff-score-edit>span{padding-bottom:12px;font-weight:900}
+.playoff-protocol-editor .primary-button{margin-top:12px}
