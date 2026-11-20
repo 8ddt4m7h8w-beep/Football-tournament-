@@ -84,3 +84,12 @@
 .playoff-score-edit input{width:100%;min-width:0;padding:12px;border:1px solid #96A6B6;border-radius:9px;background:#fff;color:#1E2945;font:800 22px "Barlow Condensed";text-align:center}
 .playoff-score-edit>span{padding-bottom:12px;font-weight:900}
 .playoff-protocol-editor .primary-button{margin-top:12px}
+
+/* Главная страница плей-офф: только краткий результат */
+#playoffList .playoff-summary-card{display:block;padding:18px 16px;cursor:pointer}
+#playoffList .playoff-summary-card .match-row{grid-template-columns:minmax(0,1fr) 86px minmax(0,1fr);gap:6px}
+#playoffList .playoff-summary-card .team-side{font-size:clamp(15px,4.2vw,21px)}
+#playoffList .playoff-summary-score{font-size:30px}
+#playoffList .third-place-result{display:block;margin-top:16px;padding:20px 10px;font-size:clamp(27px,7vw,38px);font-weight:900;line-height:1.15}
+#playoffList .champion-result{display:block;margin-top:16px;padding:16px 10px;font-size:clamp(21px,5.5vw,29px)}
+#playoffList .open-protocol-hint{margin-top:12px;text-align:center;font-weight:800;font-size:12px}
