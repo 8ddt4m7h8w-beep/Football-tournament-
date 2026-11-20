@@ -39,6 +39,7 @@ async function save(msg="Изменения сохранены",immediate=false)
  saveQueue=task.then(()=>undefined,()=>undefined);
  return await task;
 }
+function restoreLocalState(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){console.error("Could not restore local backup:",e)}}
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const team=id=>state.teams.find(t=>t.id===id), name=id=>team(id)?.name||"—", done=m=>m.completed===true;
 function renderMatches(){let el=document.getElementById("matchesList");el.innerHTML=state.matches.map(m=>`<article class="match-card" data-open-match="${m.id}" tabindex="0" role="button" aria-label="Открыть протокол ${esc(m.label)}"><div class="match-top"><span class="match-label">${esc(m.label)} · Среда / пятница · 7-й урок</span><span class="match-status ${done(m)?"":"pending"}">${done(m)?"ЗАВЕРШЁН":"ОЖИДАЕТСЯ"}</span></div><div class="match-row"><div class="team-side">${esc(name(m.a))}</div><div class="score-box"><input class="score-input" type="number" min="0" max="99" inputmode="numeric" placeholder="0" aria-label="Голы ${esc(name(m.a))}" value="${m.scoreA??0}" data-match="${m.id}" data-side="A" ${isAdmin?"":"disabled"}><span class="score-sep">:</span><input class="score-input" type="number" min="0" max="99" inputmode="numeric" placeholder="0" aria-label="Голы ${esc(name(m.b))}" value="${m.scoreB??0}" data-match="${m.id}" data-side="B" ${isAdmin?"":"disabled"}></div><div class="team-side right">${esc(name(m.b))}</div></div><div class="match-bottom"><span>⏱ ${m.minutes||10} минут · ${m.events?.length||0} событий</span>${isAdmin?`<button class="clear-score" data-clear="${m.id}">Сбросить матч</button><button class="clear-score finish-match" data-finish="${m.id}" ${done(m)?"disabled":""}>${done(m)?"Матч завершён ✓":"Матч завершён"}</button>`:""}</div><div class="open-protocol-hint">Нажмите, чтобы открыть протокол матча →</div></article>`).join("");
@@ -75,7 +76,7 @@ function renderPlayoff(){
   if(m.scoreA!==null&&m.scoreB!==null&&m.scoreA!==m.scoreB)m.winner=m.scoreA>m.scoreB?p[key].a:p[key].b;
   else if(m.scoreA!==null&&m.scoreB!==null&&m.scoreA===m.scoreB)m.winner=w.value||null;
   b.disabled=true;b.textContent='Сохраняем…';
-  if(!(await save('Результат плей-офф сохранён',true))){Object.assign(m,before);renderAll();return}
+  if(!(await save('Результат плей-офф сохранён',true))){Object.assign(m,before);restoreLocalState();renderAll();return}
   renderAll();
  });
  el.querySelectorAll('[data-play-event]').forEach(form=>form.onsubmit=async e=>{
@@ -87,14 +88,14 @@ function renderPlayoff(){
   m.events.push({id:uid('pe'),type,playerId:pid,teamId:player.team.id,minute:min});m.completed=false;
   if(type==='goal'){if(player.team.id===p[key].a)m.scoreA=(m.scoreA??0)+1;else m.scoreB=(m.scoreB??0)+1;m.winner=null}
   const submit=form.querySelector('button[type="submit"]');if(submit){submit.disabled=true;submit.textContent='Сохраняем…'}
-  if(!(await save('Событие плей-офф сохранено',true))){Object.assign(m,before);renderAll();return}
+  if(!(await save('Событие плей-офф сохранено',true))){Object.assign(m,before);restoreLocalState();renderAll();return}
   renderAll();
  });
  el.querySelectorAll('[data-play-remove]').forEach(b=>b.onclick=async()=>{
   const key=b.dataset.playRemove,m=state.playoff[key],before=structuredClone(m),index=Number(b.dataset.index),ev=m.events[index];if(!ev)return;
   if(ev.type==='goal'){if(ev.teamId===p[key].a)m.scoreA=Math.max(0,(m.scoreA??0)-1);else if(ev.teamId===p[key].b)m.scoreB=Math.max(0,(m.scoreB??0)-1);m.winner=null}
   m.events.splice(index,1);m.completed=false;
-  if(!(await save('Событие удалено',true))){Object.assign(m,before);renderAll();return}
+  if(!(await save('Событие удалено',true))){Object.assign(m,before);restoreLocalState();renderAll();return}
   renderAll();
  });
  el.querySelectorAll('[data-play-finish]').forEach(b=>b.onclick=async()=>{
@@ -102,7 +103,7 @@ function renderPlayoff(){
   if(m.scoreA===null||m.scoreB===null){if(!m.winner){toast('Сначала внесите счёт или укажите победителя по серии пенальти');return}}
   else if(m.scoreA===m.scoreB&&!m.winner){toast('При ничьей выберите победителя');return}
   m.completed=true;
-  if(!(await save('Матч плей-офф окончен',true))){Object.assign(m,before);renderAll();return}
+  if(!(await save('Матч плей-офф окончен',true))){Object.assign(m,before);restoreLocalState();renderAll();return}
   renderAll();
  });
 }
