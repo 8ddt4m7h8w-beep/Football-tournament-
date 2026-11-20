@@ -57,7 +57,7 @@ function playoffCard(key,label,ids){
  if(!Array.isArray(m.events))m.events=[];
  const w=winner(m,[ids.a,ids.b]);
  const shootout=m.shootout?'<div class="playoff-shootout"><strong>Серия пенальти</strong><div>'+esc(m.shootout.scoreA??1)+':'+esc(m.shootout.scoreB??0)+(m.shootout.scorer?' '+esc(m.shootout.scorer):'')+'</div></div>':'';
- const notes=esc(m.notes||'');
+ const rawNotes=String(m.notes||'').trim();const normalizedNotes=rawNotes.replace(/\\s+/g,' ').toLowerCase();const notes=esc(m.shootout&&normalizedNotes==='серия пенальти 1:0 буланов'?'':rawNotes);
  const events=m.events.map((e,i)=>{const f=findPlayer(e.playerId),symbol=e.type==='goal'?'⚽':e.type==='yellow'?'🟨':'🟥';return '<div class="playoff-event"><span>'+symbol+'</span><div><strong>'+esc(f?.player.name||'Игрок')+'</strong><small>'+esc(f?.team.name||'')+' · '+esc(e.type==='goal'?'Гол':e.type==='yellow'?'Жёлтая карточка':'Красная карточка')+(e.minute?' · '+esc(e.minute)+'′':'')+'</small></div>'+(isAdmin?'<button type="button" class="small-delete" data-play-remove="'+key+'" data-index="'+i+'" aria-label="Удалить событие">×</button>':'')+'</div>'}).join('');
  const players=state.teams.filter(t=>t.id===ids.a||t.id===ids.b).flatMap(t=>t.players.map(p=>({team:t,player:p})));
  const options=players.map(x=>'<option value="'+esc(x.player.id)+'">'+esc(x.player.name)+' · '+esc(x.team.name)+'</option>').join('');
